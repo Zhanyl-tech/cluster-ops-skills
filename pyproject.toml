@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cluster-ops-skills"
+version = "0.1.0"
+description = "Production HPC and GPU cluster runbooks packaged as loadable Agent Skills, with a validator that keeps them honest."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Zhanyl Abdybaeva" }]
+keywords = ["slurm", "hpc", "agent-skills", "runbooks", "gpu-cluster", "sre"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: System :: Distributed Computing",
+]
+dependencies = ["PyYAML>=6.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.11", "types-PyYAML"]
+
+[project.scripts]
+cluster-ops-skills = "cluster_ops_skills.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Zhanyl-tech/cluster-ops-skills"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cluster_ops_skills"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+files = ["src", "tests"]
+python_version = "3.11"
+strict = true
+mypy_path = "src"
