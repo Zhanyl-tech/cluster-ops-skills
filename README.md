@@ -5,7 +5,7 @@
 diagnosis an operator actually performs, and — more importantly — the wrong
 conclusions that diagnosis invites.
 
-> **v0.1.0.** Five runbooks, a validator, and the contract they must satisfy.
+> **v0.2.0.** Eleven runbooks, a validator, and the contract they must satisfy.
 > Requires no cluster to inspect or test.
 
 ---
@@ -33,8 +33,22 @@ An agent that never hands off is worse than one that never starts.
 | `queue-not-draining` | Treating a full cluster as a broken scheduler, and tuning priority weights that measurement shows barely matter |
 | `gpu-node-drained` | Reading the state column instead of the drain reason — a validator, a human and a kernel panic all look identical there |
 | `accounting-path-stalled` | Diagnosing "scheduling has halted" from a hanging `sacct`. Measured: it has not |
+| `state-save-unwritable` | Confusing the storage failure that *does* stop submissions with the one that doesn't. They behave oppositely |
 | `backfill-not-running` | Recommending priority weights instead of time-limit accuracy |
+| `partition-limit-starvation` | Reading idle nodes as available capacity without checking partition membership and limits |
+| `controller-rpc-saturation` | Blaming the largest job. RPC load tracks job and client *count*, not job size |
+| `fabric-degraded-collectives` | Concluding "the network is fine" from a healthy link state. Up and healthy are different |
+| `gpu-allocated-but-idle` | Concluding the cluster needs more GPUs from allocation figures. Allocated is not utilized |
+| `evidence-is-gone` | Naming the most plausible cause after the evidence window has closed |
 | `slinky-authkey-rotation` | Trusting a zero exit code. `kubectl rollout restart` silently skips Slinky's `NodeSet`-owned nodes |
+
+Nine of the eleven map onto a fault family in
+[slurm-rca-bench](https://github.com/Zhanyl-tech/slurm-rca-bench) — storage,
+accounting, controller, gpu, fabric, scheduler_config — so each encodes a
+failure that has been reproduced rather than imagined. `evidence-is-gone` is
+the odd one: it exists because that benchmark awards full credit for abstaining
+on its deliberately undiagnosable scenarios, and no runbook set treats knowing
+when to stop as a skill.
 
 Every measured figure in these runbooks links to the repo that measured it. The
 validator fails a skill that quotes a percentage without a source, because a
@@ -79,9 +93,10 @@ Enforced in [`loader.py`](src/cluster_ops_skills/loader.py) and tested:
   [slurm-rca-bench](https://github.com/Zhanyl-tech/slurm-rca-bench). No such
   measurement has been run, so no claim is made.
 - **Slurm-shaped.** The Kubernetes side of a hybrid fleet is not covered yet.
-- **Five runbooks is a starting set**, chosen because each encodes a failure
-  already measured elsewhere in these repos rather than one imagined for the
-  purpose.
+- **On-prem Slurm shaped.** These target a self-managed cluster: the
+  controller, the accounting path, the fabric, and the fleet. Cloud-managed
+  Slurm and the Kubernetes side of a hybrid estate are not covered yet beyond
+  the Slinky rotation runbook.
 
 ## Related
 
