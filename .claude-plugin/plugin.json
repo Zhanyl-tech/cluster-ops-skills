@@ -1,0 +1,11 @@
+{
+  "name": "cluster-ops-skills",
+  "description": "Operator runbooks for self-managed Slurm and GPU clusters, written against the read-only slurm-mcp tool surface.",
+  "author": {
+    "name": "Zhanyl Abdybaeva"
+  },
+  "homepage": "https://github.com/Zhanyl-tech/cluster-ops-skills",
+  "repository": "https://github.com/Zhanyl-tech/cluster-ops-skills",
+  "license": "MIT",
+  "keywords": ["slurm", "hpc", "gpu-cluster", "runbooks", "sre"]
+}

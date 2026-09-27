@@ -1,0 +1,14 @@
+{
+  "name": "cluster-ops-skills",
+  "description": "Operator runbooks for self-managed Slurm and GPU clusters.",
+  "owner": {
+    "name": "Zhanyl Abdybaeva"
+  },
+  "plugins": [
+    {
+      "name": "cluster-ops-skills",
+      "source": ".",
+      "description": "Eleven Slurm and GPU cluster diagnosis runbooks, each with the wrong conclusion it prevents and a hand-off point."
+    }
+  ]
+}

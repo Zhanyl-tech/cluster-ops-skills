@@ -1,0 +1,370 @@
+# Every figure a runbook quotes, and where it came from.
+#
+# `cluster-ops-skills validate` (and the test suite) fail when a number in any
+# skills/*/SKILL.md or skills/*/references/*.md is not covered by an entry here,
+# when an entry's text no longer appears exactly once in its file, or when an
+# entry is not sourced the way its kind requires. A number is anything written
+# in digits, or a spelled-out cardinal from "two" upward ("ninety seconds",
+# "tens of seconds"); "one" and ordinals are not detected (see loader.py).
+#
+# kind:
+#   measured      produced by running something. `source` is a commit-pinned
+#                 permalink into one of the portfolio repos, `method` says what
+#                 was run, and the runbook must link that same permalink.
+#   documented    stated by upstream documentation. `source` is the doc URL,
+#                 which the runbook must link.
+#   illustrative  an example, a piece of reasoning, or a count of things the
+#                 runbook itself names -- not a measurement. `note` says which,
+#                 and the runbook must not present it as measured.
+#
+# `text` is matched whitespace-insensitively, so re-wrapping a paragraph does
+# not orphan an entry. `file` defaults to SKILL.md.
+
+claims:
+  # --- accounting-path-stalled ------------------------------------------------
+  - skill: accounting-path-stalled
+    text: "t+0s      baseline — sacct ok, node idle, DBD Agent queue size 0"
+    kind: measured
+    source: &s01 https://github.com/Zhanyl-tech/slurm-rca-bench/blob/469ea760de677295a833f709b7713f06e36abff2/scenarios/S01-storage-stall-scheduling-halt/scenario.yaml
+    method: &s01m >-
+      slurm-rca-bench S01 verification block (measured: true): the fully probed
+      live run on the bench's Docker Compose project, Slurm 25.11.4, single CPU
+      worker; the database container paused with `docker pause`; sacct, sinfo,
+      sdiag, sbatch and squeue probed every 10-60 s for about 16 minutes; healed
+      with `docker unpause` and re-probed. An emulated stall, not a filesystem
+      fault. The block also records one observation from a second run (see the
+      t+180s entry).
+  - skill: accounting-path-stalled
+    text: "t+5s      sacct BLOCKS (no return, no error); sinfo still fine"
+    kind: measured
+    source: *s01
+    method: *s01m
+  - skill: accounting-path-stalled
+    text: "t+60s     DBD Agent queue size 1"
+    kind: measured
+    source: *s01
+    method: *s01m
+  - skill: accounting-path-stalled
+    text: "t+840s    DBD Agent queue size 6 and climbing; sbatch still accepted"
+    kind: measured
+    source: *s01
+    method: *s01m
+  - skill: accounting-path-stalled
+    text: "t+900s    submitted jobs reach the node and run; queue drains"
+    kind: measured
+    source: *s01
+    method: *s01m
+  - skill: accounting-path-stalled
+    text: "heal+10s  sacct returns; queued records flush — jobs COMPLETED"
+    kind: measured
+    source: *s01
+    method: *s01m
+  - skill: accounting-path-stalled
+    text: "a second run reached the same depth of 6 at t+180s"
+    kind: measured
+    source: *s01
+    method: >-
+      slurm-rca-bench S01 verification block, observation "t+180s": "sdiag DBD
+      Agent queue size reaches 6 on a second run (make smoke)"; its caveats add
+      that "Two runs reached a depth of 6 at t+180s and t+840s respectively".
+      The block records only this queue-depth reading for the second run, on
+      the same emulated stall (database container paused), not a full probe.
+  - skill: accounting-path-stalled
+    text: "Job start latency degraded to tens of seconds"
+    kind: measured
+    source: *s01
+    method: >-
+      slurm-rca-bench S01 verification caveats, from the fully probed run: "Job
+      start latency did degrade to tens of seconds". The block gives no exact
+      latency figure.
+  - skill: accounting-path-stalled
+    text: "the two jobs submitted *during* the stall ran to completion"
+    kind: measured
+    source: *s01
+    method: &s01jobs >-
+      slurm-rca-bench S01 verification block, fully probed run: "Jobs 4 and 5
+      were submitted while the backend was stalled and both completed", and
+      "heal+10s ... jobs 4 and 5 both COMPLETED" in sacct.
+  - skill: accounting-path-stalled
+    text: "two jobs submitted during the stall"
+    kind: measured
+    source: *s01
+    method: *s01jobs
+  - skill: accounting-path-stalled
+    text: "Slurm 25.11.4, the database container paused"
+    kind: measured
+    source: *s01
+    method: *s01m
+  - skill: accounting-path-stalled
+    text: "about 16 minutes"
+    kind: measured
+    source: *s01
+    method: *s01m
+  - skill: accounting-path-stalled
+    text: "default 10000"
+    kind: documented
+    source: https://slurm.schedmd.com/slurm.conf.html
+    note: MaxDBDMsgs default, "10000, or MaxJobCount * 2 + Node Count * 4, whichever is greater".
+  - skill: accounting-path-stalled
+    text: "rejected with an I/O error at t+12s"
+    kind: measured
+    source: &s06 https://github.com/Zhanyl-tech/slurm-rca-bench/blob/469ea760de677295a833f709b7713f06e36abff2/scenarios/S06-state-save-unwritable/scenario.yaml
+    method: &s06m >-
+      slurm-rca-bench S06 verification block (measured: true): one live run on
+      the bench's Compose project, Slurm 25.11.4; `chmod 500` on
+      StateSaveLocation inside the slurmctld container, sbatch attempted,
+      `chmod 755` restored, sbatch re-attempted, sacct as source of truth.
+      A real permission failure ("rather than an emulation of one", in S06's
+      own words) on the bench's container cluster. Covers that case only, not
+      a hung filesystem.
+
+  # --- state-save-unwritable -------------------------------------------------
+  - skill: state-save-unwritable
+    text: "rejected at t+12s"
+    kind: measured
+    source: *s06
+    method: *s06m
+  - skill: state-save-unwritable
+    text: "Three storage-shaped failures"
+    kind: illustrative
+    note: &count Counts things the runbook itself names; not a claim about a cluster.
+  - skill: state-save-unwritable
+    text: "it separates the three"
+    kind: illustrative
+    note: *count
+
+  # --- backfill-not-running ---------------------------------------------------
+  - skill: backfill-not-running
+    text: "300-job workload"
+    kind: measured
+    source: &lab https://github.com/Zhanyl-tech/slurm-scheduler-lab/tree/c02b52fd0ccdd2b748f2599574f97f68d92248cb
+    method: &labrange >-
+      Re-run on 2026-09-26 from a git archive of slurm-scheduler-lab c02b52f on
+      Python 3.12.13: `schedlab --compare-backfill --jobs 300 --seed N` for
+      N = 0..9 (the lab's defaults otherwise: 16 nodes of 8 CPUs and 2 GPUs),
+      summarised by scripts/lab_figures.py in this repo. Simulator output on a
+      seeded synthetic workload; not Slurm and not a site trace.
+  - skill: backfill-not-running
+    text: "16 simulated nodes"
+    kind: measured
+    source: *lab
+    method: *labrange
+  - skill: backfill-not-running
+    text: "Across seeds 0–9:"
+    kind: measured
+    source: *lab
+    method: *labrange
+  - skill: backfill-not-running
+    text: "| simulated, seeds 0–9 |"
+    kind: measured
+    source: *lab
+    method: *labrange
+  - skill: backfill-not-running
+    text: "| CPU utilization | 49.5–82.6% | 77.1–92.5% |"
+    kind: measured
+    source: *lab
+    method: *labrange
+  - skill: backfill-not-running
+    text: "| mean job wait | 1,235.6–2,144.8 min | 236.5–943.8 min |"
+    kind: measured
+    source: *lab
+    method: *labrange
+  - skill: backfill-not-running
+    text: "raised utilization in 10 of 10 seeds (by 7.6 to 32.5 points)"
+    kind: measured
+    source: *lab
+    method: *labrange
+  - skill: backfill-not-running
+    text: "mean wait in 10 of 10 (by 56% to 84%)"
+    kind: measured
+    source: *lab
+    method: *labrange
+  - skill: backfill-not-running
+    text: "headline pair, 72.2% → 83.6% and 1,913.0 → 373.7 min, is seed 5 of this range"
+    kind: measured
+    source: *lab
+    method: >-
+      The lab README's compare-backfill block at c02b52f. Its command line
+      (`schedlab --compare-backfill`) omits the settings that produce it;
+      re-run on 2026-09-26 it is reproduced exactly by
+      `schedlab --compare-backfill --jobs 300 --seed 5`.
+  - skill: backfill-not-running
+    text: "sweeping one priority weight at a time (0, 1,000, 10,000 and 100,000, backfill on, seeds 0–9)"
+    kind: measured
+    source: *lab
+    method: &labsweep >-
+      Re-run on 2026-09-26 from a git archive of slurm-scheduler-lab c02b52f on
+      Python 3.12.13: `schedlab --sweep F --jobs 300 --seed N` for
+      F in age, fairshare, jobsize, qos and N = 0..9 (the lab sweeps each weight
+      over 0, 1000, 10000, 100000 with backfill on), summarised by
+      scripts/lab_figures.py in this repo: the largest per-seed utilization span
+      and the largest per-seed max/min mean-wait ratio. Simulator output only.
+  - skill: backfill-not-running
+    text: "moved utilization by up to 20.7 points and mean wait by up to 4.27x"
+    kind: measured
+    source: *lab
+    method: *labsweep
+  - skill: backfill-not-running
+    text: "(at most 4.9 points and 1.28x)"
+    kind: measured
+    source: *lab
+    method: *labsweep
+  - skill: backfill-not-running
+    text: "the setting with the highest utilization (93.4%) also had the worst mean wait (496.7 min)"
+    kind: measured
+    source: *lab
+    method: >-
+      The lab README's `--sweep jobsize` block at c02b52f (weight=100000 row);
+      re-run on 2026-09-26 it is reproduced exactly by
+      `schedlab --sweep jobsize --jobs 300 --seed 5`.
+  - skill: backfill-not-running
+    text: "the same 50-second job backfills at once when it requests 50 seconds and does not when it requests 500"
+    kind: measured
+    source: &labtest https://github.com/Zhanyl-tech/slurm-scheduler-lab/blob/c02b52fd0ccdd2b748f2599574f97f68d92248cb/tests/test_scheduling.py#L188-L206
+    method: &labtestm >-
+      The lab's unit test test_backfill_plans_against_time_limit_not_true_runtime:
+      two otherwise identical three-job workloads on a 4-node, 1-CPU simulated
+      cluster, where the third job runs for 50 s and requests either 50 s or
+      500 s. It demonstrates the mechanism; it is not a workload-scale result.
+  - skill: backfill-not-running
+    text: "a unit test that runs two otherwise identical three-job workloads"
+    kind: measured
+    source: *labtest
+    method: *labtestm
+  - skill: backfill-not-running
+    text: "Do not compare the two directly"
+    kind: illustrative
+    note: *count
+  - skill: backfill-not-running
+    text: "`bf_max_job_test` defaults to 500 jobs, `bf_interval` to 30 seconds"
+    kind: documented
+    source: https://slurm.schedmd.com/slurm.conf.html
+  - skill: backfill-not-running
+    text: "`bf_window` to 1440 minutes"
+    kind: documented
+    source: https://slurm.schedmd.com/slurm.conf.html
+
+  # --- queue-not-draining -----------------------------------------------------
+  - skill: queue-not-draining
+    text: "(by up to 20.7 points and 4.27x)"
+    kind: measured
+    source: *lab
+    method: *labsweep
+  - skill: queue-not-draining
+    text: "improved both in all 10 seeds tried"
+    kind: measured
+    source: *lab
+    method: *labrange
+  - skill: queue-not-draining
+    text: "Two things follow from those definitions"
+    kind: illustrative
+    note: *count
+  - skill: queue-not-draining
+    text: "Two common reasons they cannot"
+    kind: illustrative
+    note: The author's selection of common causes, listed right after it; not a measured frequency.
+
+  # --- controller-rpc-saturation ----------------------------------------------
+  - skill: controller-rpc-saturation
+    text: "at 256 threads"
+    kind: documented
+    source: https://slurm.schedmd.com/slurm.conf.html
+    note: '"The maximum number of threads (MAX_SERVER_THREADS) is internally set to 256", under max_rpc_cnt.'
+  - skill: controller-rpc-saturation
+    text: "a 512-node job is still one job, so it is unlikely to out-talk hundreds of single-node jobs"
+    kind: illustrative
+    note: Reasoning about RPC load following job and client count; nothing was measured.
+
+  # --- evidence-is-gone ---------------------------------------------------------
+  - skill: evidence-is-gone
+    text: "Two shapes recur:"
+    kind: illustrative
+    note: The author's grouping of the undiagnosable cases, listed right after it; not a measured frequency.
+  - skill: evidence-is-gone
+    text: "One job in fifty fails, with no pattern."
+    kind: illustrative
+    note: &example An invented example of the pattern, not an observed incident.
+  - skill: evidence-is-gone
+    text: "Three failures on one node out of a fleet of forty"
+    kind: illustrative
+    note: *example
+
+  # --- fabric-degraded-collectives ----------------------------------------------
+  - skill: fabric-degraded-collectives
+    text: "a device two jobs share"
+    kind: illustrative
+    note: &hypothetical A hypothetical placement used to explain the attribution rule, not an observation.
+  - skill: fabric-degraded-collectives
+    text: "If two jobs are on the same node"
+    kind: illustrative
+    note: *hypothetical
+
+  # --- gpu-allocated-but-idle -------------------------------------------------
+  - skill: gpu-allocated-but-idle
+    text: "eight GPUs at 0% utilization for eleven hours"
+    kind: illustrative
+    note: *example
+  - skill: gpu-allocated-but-idle
+    text: "Distinguish the three shapes"
+    kind: illustrative
+    note: *count
+  - skill: gpu-allocated-but-idle
+    text: "twelve-hour training run"
+    kind: illustrative
+    note: *example
+
+  # --- gpu-node-drained -------------------------------------------------------
+  - skill: gpu-node-drained
+    text: "(default 300 seconds)"
+    kind: documented
+    source: https://slurm.schedmd.com/slurm.conf.html
+    note: SlurmdTimeout default.
+  - skill: gpu-node-drained
+    text: "Two different things take a node out of the pool"
+    kind: illustrative
+    note: *count
+  - skill: gpu-node-drained
+    file: references/operator-handoff.md
+    text: "DCGM's level 3 diagnostic"
+    kind: documented
+    source: &dcgm https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/dcgm-diagnostics.html
+  - skill: gpu-node-drained
+    file: references/operator-handoff.md
+    text: "as measured on Hopper GPU systems, at under 10 minutes on 4-GPU systems and under 35 minutes on 8-GPU systems"
+    kind: documented
+    source: *dcgm
+    note: >-
+      The r3 row of the run-levels table, whose column header reads "Test name
+      (measured on Hopper GPU systems)". The Hopper scope is part of the claim.
+  - skill: gpu-node-drained
+    file: references/operator-handoff.md
+    text: "describes level 3 and level 4 tests"
+    kind: documented
+    source: *dcgm
+
+  # --- slinky-authkey-rotation ------------------------------------------------
+  - skill: slinky-authkey-rotation
+    text: "Slinky operator v1.2.0, Slurm 26.05"
+    kind: measured
+    source: &slinky https://github.com/Zhanyl-tech/slinky-gitops/blob/c51903a03d668dbafc48d8e5494aed744ac10af0/README.md
+    method: &slinkym >-
+      slinky-gitops README at c51903a: the versions it was built and tested
+      against, and the runs recorded under "What CI caught" on a KinD cluster.
+  - skill: slinky-authkey-rotation
+    text: "passed 130 ms after the rollout"
+    kind: measured
+    source: *slinky
+    method: *slinkym
+  - skill: slinky-authkey-rotation
+    text: "no self-heal in ninety seconds of watching"
+    kind: measured
+    source: *slinky
+    method: >-
+      slinky-gitops README at c51903a, "What CI caught": after a slurmd pod was
+      replaced the node showed reason `slurm-operator: Pod`, and "ninety seconds
+      of watching showed no self-heal". A single observation on KinD; the
+      README gives no finer timing.
+  - skill: slinky-authkey-rotation
+    text: "Beginning with version 24.05"
+    kind: documented
+    source: https://slurm.schedmd.com/authentication.html

@@ -1,7 +1,7 @@
 ---
 name: evidence-is-gone
 description: Decide whether a cluster incident is still diagnosable, and abstain when it is not. Use when investigating a node that already rebooted, an intermittent failure with no pattern, or any incident where logs have rotated and the evidence window has closed. Also use to sanity-check a confident diagnosis.
-allowed-tools: slurm_query, slurm_overview, slurm_describe
+allowed-tools: mcp__slurm-mcp__slurm_query mcp__slurm-mcp__slurm_overview mcp__slurm-mcp__slurm_describe
 ---
 
 # The evidence is gone
@@ -47,8 +47,9 @@ search.
 ## What not to conclude
 
 - **Do not name the most plausible cause when the evidence is gone.** Plausible
-  is not measured. This is the single most expensive mistake in cluster
-  diagnosis, and it is graded as worse than abstention for that reason.
+  is not measured. In the author's judgement (not measured) this is among the
+  most expensive mistakes in cluster diagnosis, and slurm-rca-bench grades it as
+  worse than abstention for that reason.
 - **Do not treat absence of evidence as evidence of absence.** "No errors in
   the logs" after a rotation means the logs are gone, not that there were no
   errors.

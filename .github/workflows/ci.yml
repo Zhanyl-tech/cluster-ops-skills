@@ -4,22 +4,87 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Weekly, so a cross-repo citation that stops resolving is noticed even when
+  # nothing here changes. Only the link job runs on the schedule.
+  schedule:
+    - cron: "17 6 * * 1"
 
+# Nothing in this workflow writes to the repository.
+permissions:
+  contents: read
+
+# Actions are pinned to commit SHAs (tag in the trailing comment), so a moved
+# tag cannot change what runs here.
 jobs:
   check:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
       - run: ruff check .
       - run: ruff format --check .
       - run: mypy
-      - run: pytest -q
-      # The contract is the product. A skill that fails it must fail the build.
+      - run: pytest -q --cov=cluster_ops_skills --cov-fail-under=90
+      # The contract is the product. A skill that fails it -- or quotes a figure
+      # the claims ledger does not account for -- must fail the build.
       - run: cluster-ops-skills validate
+
+  spec:
+    # The local validator is stricter than the Agent Skills spec in places and
+    # was once looser in others. Run the upstream reference validator too.
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - run: pip install skills-ref==0.1.1
+      - run: for d in skills/*/; do agentskills validate "$d"; done
+
+  wheel:
+    # `pip install -e` hides packaging mistakes: an editable install reads the
+    # skills from the checkout. Build the wheel, install it somewhere that
+    # cannot see the checkout, and use it.
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build --wheel --outdir dist
+      - name: The wheel carries every skill and the claims ledger
+        run: |
+          expected=$(ls -d skills/*/ | wc -l)
+          shipped=$(python -m zipfile -l dist/*.whl | grep -c '/SKILL.md')
+          echo "skills in repo: $expected, in wheel: $shipped"
+          test "$expected" -eq "$shipped"
+          python -m zipfile -l dist/*.whl | grep -q 'cluster_ops_skills/claims.yaml'
+      - name: Install into a clean venv and run the CLI from outside the checkout
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel-venv"
+          "$RUNNER_TEMP/wheel-venv/bin/pip" install dist/*.whl
+          cd "$RUNNER_TEMP"
+          wheel-venv/bin/cluster-ops-skills validate
+          wheel-venv/bin/cluster-ops-skills list
+          wheel-venv/bin/cluster-ops-skills show queue-not-draining > /dev/null
+
+  links:
+    # The runbooks' honesty model rests on cross-repo permalinks and upstream
+    # docs. A dead one is a claim that can no longer be checked.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: --no-progress --max-retries 4 --accept '200..=299,429' './**/*.md' claims.yaml
+          fail: true
